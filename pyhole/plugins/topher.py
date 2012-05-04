@@ -36,7 +36,7 @@ class Topher(plugin.Plugin):
             self.irc.connection.privmsg(target, greeting)
 
     @plugin.hook_add_action("join")
-    def join(self, params, **kwargs):
+    def join(self, params=None, **kwargs):
         target = kwargs.get("target")
         source = params
         if not source or not target:
