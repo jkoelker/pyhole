@@ -19,6 +19,7 @@ import urllib
 
 from pyhole import plugin
 
+
 class TinyURL(plugin.Plugin):
     """Provides a short url when a long one is posted"""
 
@@ -26,11 +27,16 @@ class TinyURL(plugin.Plugin):
         self.irc = irc
         self.name = self.__class__.__name__
 
+    def _shorten(self, url):
+        if len(url) > 20:
+            tiny_api = ("http://tinyurl.com/api-create.php?url=" +
+                        urllib.quote_plus(url))
+            self.irc.reply(urllib.urlopen(tiny_api).read())
+
     @plugin.hook_add_keyword("http://")
     def http(self, params=None, **kwargs):
-        print params
-        if len(params) > 20:
-            tiny_api = ("http://tinyurl.com/api-create.php?url=" + 
-                           urllib.quote_plus(params))
-            print "requesting tinyurl from " + tiny_api
-            self.irc.reply(urllib.urlopen(tiny_api).read())
+        self._shorten("http://" + params)
+
+    @plugin.hook_add_keyword("https://")
+    def https(self, params=None, **kwargs):
+        self._shorten("https://" + params)
