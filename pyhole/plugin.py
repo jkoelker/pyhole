@@ -23,6 +23,8 @@ import utils
 
 
 LOG = log.get_logger()
+_plugin_instances = []
+_plugin_hooks = {}
 
 
 def _reset_variables():
