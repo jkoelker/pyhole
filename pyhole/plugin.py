@@ -70,7 +70,7 @@ def active_get(hookname):
     """
     return [x[2] for x in _plugin_hooks[hookname]]
 
-_hook_names = ["keyword", "command", "msg_regex"]
+_hook_names = ["keyword", "command", "msg_regex", "action"]
 _reset_variables()
 _this_mod = sys.modules[__name__]
 
