@@ -42,3 +42,11 @@ class Topher(plugin.Plugin):
         if not source or not target:
             return
         self.say_hi(source, target)
+
+    @plugin.hook_add_command("hi")
+    def hi(self, params=None, **kwargs):
+        greeting = self.config.get("greeting")
+        if not greeting:
+            return
+
+        self.irc.reply(greeting)
