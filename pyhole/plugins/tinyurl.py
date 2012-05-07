@@ -18,6 +18,7 @@
 import urllib
 
 from pyhole import plugin
+from pyhole import utils
 
 
 class TinyURL(plugin.Plugin):
@@ -26,9 +27,10 @@ class TinyURL(plugin.Plugin):
     def __init__(self, irc):
         self.irc = irc
         self.name = self.__class__.__name__
+        self.config = utils.get_config("TinyURL")
 
     def _shorten(self, url):
-        if len(url) > 20:
+        if len(url) > self.config.get("length", type="int", default=50):
             tiny_api = ("http://tinyurl.com/api-create.php?url=" +
                         urllib.quote_plus(url))
             self.irc.reply(urllib.urlopen(tiny_api).read())
