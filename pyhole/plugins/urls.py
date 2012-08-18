@@ -1,4 +1,4 @@
-#   Copyright 2011 Josh Kearney
+#   Copyright 2011-2012 Josh Kearney
 #
 #   Licensed under the Apache License, Version 2.0 (the "License");
 #   you may not use this file except in compliance with the License.
@@ -43,15 +43,19 @@ class Url(plugin.Plugin):
         """Watch and keep track of the latest URL"""
         try:
             self.url = kwargs["full_message"].split(" ", 1)[0]
+            host = self.url[7:]
 
-            if self.url[7:].startswith("open.spotify.com"):
+            lookup_sites = ("open.spotify.com", "/open.spotify.com",
+                    "www.youtube.com", "/www.youtube.com")
+
+            if host.startswith(lookup_sites):
                 self._find_title(self.url)
         except TypeError:
             return
 
     def _find_title(self, url):
         """Find the title of a given URL"""
-        if not url.startswith("http://"):
+        if not url.startswith(("http://", "https://")):
             url = "http://" + url
 
         response = self.irc.fetch_url(url, self.name)
@@ -59,9 +63,13 @@ class Url(plugin.Plugin):
             return
 
         soup = BeautifulSoup(response.read())
-
         if soup.head:
             title = utils.decode_entities(soup.head.title.string)
-            self.irc.reply(title)
+            content_type = response.headers.get("Content-Type").split(";",
+                    1)[0]
+            content_size = response.headers.get("Content-Length")
+            content_size = content_size + " bytes" if content_size else "N/A"
+
+            self.irc.reply("%s (%s, %s)" % (title, content_type, content_size))
         else:
             self.irc.reply("No title found for %s" % url)
