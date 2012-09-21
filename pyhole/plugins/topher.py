@@ -67,10 +67,10 @@ class Topher(plugin.Plugin):
 
     @plugin.hook_add_msg_regex('.')
     def catchphrase(self, params=None, **kwargs):
-        chance = random.randint(0, 100)
+        chance = random.randint(0, 1000)
         if chance == 1:
             phrases_count = len(phrases)
-            which_phrase = random.randint(0, phrases_count-1)
+            which_phrase = random.randint(0, phrases_count - 1)
             self.irc.reply(phrases[which_phrase])
 
     @plugin.hook_add_msg_regex('\?')
