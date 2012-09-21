@@ -26,7 +26,7 @@ phrases = [
     "They live in the Penthouse penthouse. Thats like the Playboy"
     " Mansion only this time its much more doper",
     "Chill out. I told them that you three are coke dealers, and they"
-    " all have really bad coke problems" ]
+    " all have really bad coke problems"]
 
 
 class Topher(plugin.Plugin):
@@ -61,21 +61,25 @@ class Topher(plugin.Plugin):
 
         self.irc.reply(greeting)
 
+    def _to_message_or_not_to_message():
+        """That is the question"""
+        chance = random.randint(0, 1000)
+        return chance == 1
+
     @plugin.hook_add_msg_regex('smoke')
     def smoke(self, params=None, **kwargs):
-        self.irc.reply('But never with the trooooooooooon...')
+        if self._to_message_or_not_to_message():
+            self.irc.reply('But never with the trooooooooooon...')
 
     @plugin.hook_add_msg_regex('.')
     def catchphrase(self, params=None, **kwargs):
-        chance = random.randint(0, 1000)
-        if chance == 1:
+        if self._to_message_or_not_to_message():
             phrases_count = len(phrases)
             which_phrase = random.randint(0, phrases_count - 1)
             self.irc.reply(phrases[which_phrase])
 
     @plugin.hook_add_msg_regex('\?')
     def piss_roof(self, params=None, **kwargs):
-        chance = random.randint(0, 10)
-        if chance == 1:
+        if self._to_message_or_not_to_message():
             self.irc.reply("Yeah, if you don't mind if I take a piss "
                            "off your roof first")
