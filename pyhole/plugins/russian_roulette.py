@@ -55,6 +55,6 @@ class RussianRoulette(plugin.Plugin):
             else:
                 result = self.roulette.__doc__
         else:
-            result = self.rouelette.__doc__
+            result = self.roulette.__doc__
 
         self.irc.reply(result)
