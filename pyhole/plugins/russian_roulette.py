@@ -53,8 +53,8 @@ class RussianRoulette(plugin.Plugin):
                 result = 'Come on man, you chicken?'
                 self.game = None
             else:
-                result = self.roll.__doc__
+                result = self.roulette.__doc__
         else:
-            result = self.roll.__doc__
+            result = self.rouelette.__doc__
 
         self.irc.reply(result)
