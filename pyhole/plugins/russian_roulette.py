@@ -14,7 +14,11 @@
 
 """Pyhole Russian Roulette Plugin"""
 
-import random
+try:
+    import randomSources
+    random = randomSources.RandomDotOrg()
+except ImportError:
+    import random
 
 from pyhole import plugin
 
@@ -29,8 +33,7 @@ class RussianRoulette(plugin.Plugin):
     def _gun(self, size=6):
         chamber = [0] * (size - 1)
         chamber.append(1)
-        for _i in xrange(size):
-            random.shuffle(chamber)
+        random.shuffle(chamber)
         return chamber
 
     @plugin.hook_add_command("russian")
@@ -52,7 +55,7 @@ class RussianRoulette(plugin.Plugin):
             elif cmd == 'wuss':
                 result = 'Come on man, you chicken?'
                 self.game = None
-            elif cmd ==  'thorn':
+            elif cmd == 'thorn':
                 result = 'http://i.imgur.com/fNE4h.jpg'
             else:
                 result = self.roulette.__doc__
