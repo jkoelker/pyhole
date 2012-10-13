@@ -15,8 +15,8 @@
 """Pyhole Russian Roulette Plugin"""
 
 try:
-    import randomSources
-    random = randomSources.RandomDotOrg()
+    import randomdotorg
+    random = randomdotorg.RandomDotOrg()
 except ImportError:
     import random
 
