@@ -52,6 +52,8 @@ class RussianRoulette(plugin.Plugin):
             elif cmd == 'wuss':
                 result = 'Come on man, you chicken?'
                 self.game = None
+            elif cmd ==  'thorn':
+                result = 'http://i.imgur.com/fNE4h.jpg'
             else:
                 result = self.roulette.__doc__
         else:
