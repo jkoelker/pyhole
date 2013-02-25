@@ -17,6 +17,7 @@
 import re
 
 from pyhole import plugin
+from pyhole import utils
 
 
 class RegEx(plugin.Plugin):
@@ -28,7 +29,11 @@ class RegEx(plugin.Plugin):
 
     def history_update(self, source, message):
         self.irc_history.insert(0, (source, message))
-        if len(self.irc_history) > 10:
+        try:
+            lookback = utils.get_config("Regex").get("lookback")
+        except:
+            lookback = 10
+        if len(self.irc_history) > int(lookback):
             self.irc_history.pop()
 
     @plugin.hook_add_msg_regex('.*')
