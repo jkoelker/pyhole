@@ -323,7 +323,7 @@ class Client(irclib.SimpleIRCClient):
     def on_action(self, _connection, event):
         """Handle IRC actions."""
         target = event.target
-        source = event.source.nick
+        source = event.source
         msg = event.arguments[0]
 
         _msg = Reply(self, message=msg, source=source, target=target)
