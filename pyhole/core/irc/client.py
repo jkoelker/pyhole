@@ -14,31 +14,29 @@
 
 """Event-based IRC Class"""
 
-import multiprocessing
 import random
 import re
-import sys
+import ssl
 import time
 import urllib
 
-import irclib
-import log
-import plugin
-import utils
-import version
+import irc.client as irclib
+from irc import connection
+
+from .. import log, plugin, utils, version, Reply
 
 
 LOG = log.get_logger()
 CONFIG = utils.get_config()
 
 
-class IRC(irclib.SimpleIRCClient):
+class Client(irclib.SimpleIRCClient):
     """An IRClib connection."""
 
     def __init__(self, network):
         irclib.SimpleIRCClient.__init__(self)
         network_config = utils.get_config(network)
-
+        log.setup_logger(str(network))
         self.log = log.get_logger(str(network))
         self.version = version.version_string()
         self.source = None
@@ -59,27 +57,30 @@ class IRC(irclib.SimpleIRCClient):
         self.nick = network_config.get("nick")
         self.username = network_config.get("username", default=None)
         self.identify_password = network_config.get("identify_password",
-                default=None)
+                                                    default=None)
         self.channels = network_config.get("channels", type="list")
 
         self.load_plugins()
 
         self.log.info("Connecting to %s:%d as %s" % (self.server, self.port,
-                self.nick))
+                      self.nick))
         self.connect(self.server, self.port, self.nick, self.password,
-                ssl=self.ssl, ipv6=self.ipv6, localaddress=self.bind_to,
-                username=self.username)
+                     username=self.username,
+                     connect_factory=connection.Factory(
+                         wrapper=ssl.wrap_socket,
+                         ipv6=self.ipv6).connect
+                     if self.ssl else connection.Factory())
 
-    def run_hook_command(self, mod_name, func, arg, **kwargs):
+    def run_hook_command(self, mod_name, func, message, arg, **kwargs):
         """Make a call to a plugin hook."""
         try:
             if arg:
                 self.log.debug("Calling: %s.%s(\"%s\")" % (mod_name,
-                        func.__name__, arg))
+                               func.__name__, arg))
             else:
                 self.log.debug("Calling: %s.%s(None)" % (mod_name,
-                        func.__name__))
-            func(arg, **kwargs)
+                               func.__name__))
+            func(message, arg, **kwargs)
         except Exception, exc:
             self.log.exception(exc)
 
@@ -100,45 +101,48 @@ class IRC(irclib.SimpleIRCClient):
 
     def run_msg_regexp_hooks(self, message, private):
         """Run regexp hooks."""
+        msg = message.message
         for mod_name, func, msg_regex in plugin.hook_get_msg_regexs():
-            match = re.search(msg_regex, message, re.I)
+            match = re.search(msg_regex, msg, re.I)
             if match:
-                self.run_hook_command(mod_name, func, match, private=private,
-                        full_message=message)
+                self.run_hook_command(mod_name, func, message, match,
+                                      private=private)
 
     def run_keyword_hooks(self, message, private):
         """Run keyword hooks."""
-        words = message.split(" ")
+        msg = message.message
+        words = msg.split(" ")
         for mod_name, func, kwarg in plugin.hook_get_keywords():
             for word in words:
                 match = re.search("^%s(.+)" % kwarg, word, re.I)
                 if match:
-                    self.run_hook_command(mod_name, func, match.group(1),
-                            private=private, full_message=message)
+                    self.run_hook_command(mod_name, func, message,
+                                          match.group(1), private=private)
 
     def run_command_hooks(self, message, private):
         """Run command hooks."""
+        msg = message.message
         for mod_name, func, cmd in plugin.hook_get_commands():
             self.addressed = False
 
             if private:
-                match = re.search("^%s$|^%s\s(.*)$" % (cmd, cmd), message,
-                        re.I)
+                match = re.search("^%s$|^%s\s(.*)$" % (cmd, cmd), msg,
+                                  re.I)
                 if match:
-                    self.run_hook_command(mod_name, func, match.group(1),
-                            private=private, addressed=self.addressed,
-                            full_message=message)
+                    self.run_hook_command(mod_name, func, message,
+                                          match.group(1), private=private,
+                                          addressed=self.addressed)
 
-            if message.startswith(self.command_prefix):
+            if msg.startswith(self.command_prefix):
                 # Strip off command prefix
-                msg_rest = message[len(self.command_prefix):]
+                msg_rest = msg[len(self.command_prefix):]
             else:
                 # Check for command starting with nick being addressed
-                msg_start_upper = message[:len(self.nick) + 1].upper()
+                msg_start_upper = msg[:len(self.nick) + 1].upper()
                 if msg_start_upper == self.nick.upper() + ":":
                     # Get rest of string after "nick:" and white spaces
                     msg_rest = re.sub("^\s+", "",
-                            message[len(self.nick) + 1:])
+                                      msg[len(self.nick) + 1:])
                 else:
                     continue
 
@@ -146,9 +150,9 @@ class IRC(irclib.SimpleIRCClient):
 
             match = re.search("^%s$|^%s\s(.*)$" % (cmd, cmd), msg_rest, re.I)
             if match:
-                self.run_hook_command(mod_name, func, match.group(1),
-                        private=private, addressed=self.addressed,
-                        full_message=message)
+                self.run_hook_command(mod_name, func, message, match.group(1),
+                                      private=private,
+                                      addressed=self.addressed)
 
     def poll_messages(self, message, private=False):
         """Watch for known commands."""
@@ -167,49 +171,9 @@ class IRC(irclib.SimpleIRCClient):
             self.run_hook_command(mod_name, func, source, target=target,
                                   message=msg)
 
-    def _mangle_msg(self, msg):
-        """Prepare the message for sending."""
-        if not hasattr(msg, "encode"):
-            try:
-                msg = str(msg)
-            except Exception:
-                self.log.error("msg cannot be converted to string")
-                return
-
-        msg = msg.encode("utf-8").split("\n")
-        # NOTE(jk0): 10 is completely arbitrary for now.
-        if len(msg) > 10:
-            msg = msg[0:8]
-            msg.append("...")
-
-        return msg
-
-    def notice(self, msg):
+    def notice(self, target, msg):
         """Send a notice."""
-        msg = self._mangle_msg(msg)
-        for line in msg:
-            self.connection.notice(self.target, line)
-            if irclib.is_channel(self.target):
-                self.log.info("-%s- <%s> %s" % (self.target, self.nick, line))
-            else:
-                self.log.info("<%s> %s" % (self.nick, line))
-
-    def reply(self, msg):
-        """Send a privmsg."""
-        msg = self._mangle_msg(msg)
-        for line in msg:
-            if self.addressed:
-                source = self.source.split("!")[0]
-                self.connection.privmsg(self.target, "%s: %s" % (source, line))
-                self.log.info("-%s- <%s> %s: %s" % (self.target, self.nick,
-                        source, line))
-            else:
-                self.connection.privmsg(self.target, line)
-                if irclib.is_channel(self.target):
-                    self.log.info("-%s- <%s> %s" % (self.target, self.nick,
-                            line))
-                else:
-                    self.log.info("<%s> %s" % (self.nick, line))
+        self.connection.notice(target, msg)
 
     def privmsg(self, target, msg):
         """Send a privmsg."""
@@ -290,143 +254,115 @@ class IRC(irclib.SimpleIRCClient):
         self.log.info("Reconnecting in %d seconds" % self.reconnect_delay)
         time.sleep(self.reconnect_delay)
         self.log.info("Connecting to %s:%d as %s" % (self.server, self.port,
-                self.nick))
+                      self.nick))
         self.connect(self.server, self.port, self.nick, self.password,
-                ssl=self.ssl, username=self.username)
+                     ssl=self.ssl, username=self.username)
 
     def on_kick(self, connection, event):
         """Automatically rejoin channel if kicked."""
-        source = irclib.nm_to_n(event.source())
-        target = event.target()
-        nick, reason = event.arguments()
+        source = event.source.nick
+        target = event.target
+        nick, reason = event.arguments
 
         if nick == self.nick:
             self.log.info("-%s- kicked by %s: %s" % (target, source, reason))
             self.log.info("-%s- rejoining in %d seconds" % (target,
-                    self.rejoin_delay))
+                          self.rejoin_delay))
             time.sleep(self.rejoin_delay)
             connection.join(target)
         else:
             self.log.info("-%s- %s was kicked by %s: %s" % (target, nick,
-                    source, reason))
+                          source, reason))
 
     def on_invite(self, _connection, event):
         """Join a channel upon invitation."""
-        source = event.source().split("@", 1)[0]
+        source = event.source.split("@", 1)[0]
         if source in self.admins:
-            self.join_channel(event.arguments()[0])
+            self.join_channel(event.arguments[0])
 
     def on_ctcp(self, connection, event):
         """Respond to CTCP events."""
-        source = irclib.nm_to_n(event.source())
-        ctcp = event.arguments()[0]
+        source = event.source.nick
+        ctcp = event.arguments[0]
 
         if ctcp == "VERSION":
             self.log.info("Received CTCP VERSION from %s" % source)
             connection.ctcp_reply(source, "VERSION %s" % self.version)
         elif ctcp == "PING":
-            if len(event.arguments()) > 1:
+            if len(event.arguments) > 1:
                 self.log.info("Received CTCP PING from %s" % source)
-                connection.ctcp_reply(source,
-                        "PING %s" % event.arguments()[1])
+                connection.ctcp_reply(source, "PING %s" % event.arguments[1])
 
     def on_join(self, _connection, event):
         """Handle joins."""
-        target = event.target()
-        source = irclib.nm_to_n(event.source())
+        target = event.target
+        source = event.source.nick
         self.log.info("-%s- %s joined" % (target, source))
         self.poll_action(source, "join", target)
 
     def on_part(self, _connection, event):
         """Handle parts."""
-        target = event.target()
-        source = irclib.nm_to_n(event.source())
+        target = event.target
+        source = event.source.nick
         self.log.info("-%s- %s left" % (target, source))
         self.poll_action(source, "part", target)
 
     def on_quit(self, _connection, event):
         """Handle quits."""
-        source = irclib.nm_to_n(event.source())
+        source = event.source.nick
         self.log.info("%s quit" % source)
         self.poll_action(source, "part")
 
     def on_action(self, _connection, event):
         """Handle IRC actions."""
-        target = event.target()
-        source = irclib.nm_to_n(event.source())
-        msg = event.arguments()[0]
-        self.log.info(unicode("-%s- * %s %s" % (target, source, msg), "utf-8"))
+        target = event.target
+        source = event.source.nick
+        msg = event.arguments[0]
+        self.log.info("-%s- * %s %s" % (target, source, msg))
         self.poll_action(source, "action", target, msg=msg)
 
     def on_privnotice(self, _connection, event):
         """Handle private notices."""
-        if event.source() is not None:
-            source = irclib.nm_to_n(event.source())
+        if event.source is not None:
+            source = event.source.nick
         else:
             source = None
-        msg = event.arguments()[0]
-        self.log.info(unicode("-%s- %s" % (source, msg), "utf-8"))
+        msg = event.arguments[0]
+        self.log.info("-%s- %s" % (source, msg))
 
     def on_pubnotice(self, _connection, event):
         """Handle public notices."""
-        target = event.target()
-        if event.source() is not None:
-            source = irclib.nm_to_n(event.source())
+        target = event.target
+        if event.source is not None:
+            source = event.source.nick
         else:
             source = None
-        msg = event.arguments()[0]
-        self.log.info(unicode("-%s- <%s> %s" % (target, source, msg),
-                "utf-8"))
+        msg = event.arguments[0]
+        self.log.info("-%s- <%s> %s" % (target, source, msg))
 
     def on_privmsg(self, _connection, event):
         """Handle private messages."""
-        self.source = event.source().split("@", 1)[0]
-        self.target = irclib.nm_to_n(event.source())
-        msg = event.arguments()[0]
+        msg = event.arguments[0]
+
+        source = event.source.split("@", 1)[0]
+        target = event.source.nick
+        _msg = Reply(self, msg, source, target)
 
         if self.target != self.nick:
-            self.log.info(unicode("<%s> %s" % (self.target, msg), "utf-8"))
-            self.poll_messages(msg, private=True)
+            self.log.info("<%s> %s" % (self.target, msg))
+            self.poll_messages(_msg, private=True)
 
     def on_pubmsg(self, _connection, event):
         """Handle public messages."""
-        self.source = event.source().split("@", 1)[0]
-        self.target = event.target()
-        nick = irclib.nm_to_n(event.source())
-        msg = event.arguments()[0]
+        nick = event.source.nick
+        msg = event.arguments[0]
 
-        self.log.info(unicode("-%s- <%s> %s" % (self.target, nick, msg),
-                "utf-8"))
-        self.poll_messages(msg)
+        source = event.source.split("@", 1)[0]
+        target = event.target
+        _msg = Reply(self, msg, source, target)
 
-
-class IRCProcess(multiprocessing.Process):
-    """An IRC network connection process."""
-    def __init__(self, irc_network):
-        super(IRCProcess, self).__init__()
-        self.irc_network = irc_network
-        self.reconnect_delay = CONFIG.get("reconnect_delay", type="int")
-
-    def run(self):
-        """An IRC network connection."""
-        while True:
-            try:
-                connection = IRC(self.irc_network)
-            except Exception, exc:
-                LOG.error(exc)
-                LOG.error("Retrying in %d seconds" % self.reconnect_delay)
-                time.sleep(self.reconnect_delay)
-                continue
-
-            try:
-                connection.start()
-            except KeyboardInterrupt:
-                sys.exit(0)
-            except Exception, exc:
-                LOG.error(exc)
-                LOG.error("Retrying in %d seconds" % self.reconnect_delay)
-                time.sleep(self.reconnect_delay)
-                continue
+        self.log.info("-%s- <%s> %s" % (self.target, nick, msg))
+        self.poll_messages(_msg)
 
 
 def active_plugins():
@@ -442,30 +378,3 @@ def active_commands():
 def active_keywords():
     """List active keywords."""
     return ", ".join(sorted(plugin.active_keywords()))
-
-
-def main():
-    """Main IRC loop."""
-    networks = CONFIG.get("networks", type="list")
-
-    LOG.info("Starting %s" % version.version_string())
-    LOG.info("Connecting to IRC Networks: %s" % ", ".join(networks))
-
-    procs = []
-    for network in networks:
-        proc = IRCProcess(network)
-        proc.start()
-        procs.append(proc)
-
-    try:
-        while True:
-            time.sleep(1)
-            for proc in procs:
-                if not proc.is_alive():
-                    procs.remove(proc)
-
-            if not procs:
-                LOG.info("No longer connected to any networks, shutting down")
-                sys.exit(0)
-    except KeyboardInterrupt:
-        LOG.info("Caught KeyboardInterrupt, shutting down")

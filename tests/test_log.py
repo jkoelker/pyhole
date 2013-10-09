@@ -17,13 +17,13 @@
 import os
 import unittest
 
-from pyhole import log
-from pyhole import utils
+from pyhole.core import log, utils
 
 
 class TestLog(unittest.TestCase):
     def test_logger(self):
         test_log_dir = utils.get_home_directory() + "logs/"
+        log.setup_logger(name="test")
         test_log = log.get_logger("TEST")
         self.assertEqual("TEST", test_log.name)
         self.assertEqual(test_log.level, 0)

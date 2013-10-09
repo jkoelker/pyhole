@@ -20,8 +20,12 @@ import eventlet
 import optparse
 import os
 import re
+import sys
+import traceback
 
 from BeautifulSoup import BeautifulStoneSoup
+from functools import wraps
+from multiprocessing import Process, Queue
 
 import config
 import version
@@ -53,13 +57,44 @@ def spawn(func):
     return wrap
 
 
+def subprocess(func):
+    """Decorator running function in subprocess."""
+    def _subprocess(q, *args, **kwargs):
+        try:
+            ret = func(*args, **kwargs)
+        except Exception:
+            ex_type, ex_value, tb = sys.exc_info()
+            error = ex_type, ex_value, "".join(traceback.format_tb(tb))
+            ret = None
+        else:
+            error = None
+
+        q.put((ret, error))
+
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        q = Queue()
+        p = Process(target=_subprocess, args=[q] + list(args), kwargs=kwargs)
+        p.start()
+        p.join()
+        ret, error = q.get()
+
+        if error:
+            ex_type, ex_value, tb_str = error
+            message = "%s (in subprocess)\n%s" % (ex_value.message, tb_str)
+            raise ex_type(message)
+
+        return ret
+    return wrapper
+
+
 def decode_entities(html):
     """Strip HTML entities from a string and make it printable"""
     html = re.sub("\n", "", html)
     html = re.sub(" +", " ", html)
     html = " ".join(str(x).strip() for x in BeautifulStoneSoup(html,
-            convertEntities=BeautifulStoneSoup.HTML_ENTITIES).findAll(
-            text=True))
+                    convertEntities=BeautifulStoneSoup.HTML_ENTITIES).findAll(
+                    text=True))
 
     return filter(lambda x: ord(x) > 9 and ord(x) < 127, html)
 
@@ -77,9 +112,9 @@ def build_options():
     """Generate command line options"""
     parser = optparse.OptionParser(version=version.version_string())
     parser.add_option("-c", "--config", default=get_conf_file_path(),
-            help="specify the path to a configuration file")
+                      help="specify the path to a configuration file")
     parser.add_option("-d", "--debug", action="store_true",
-            help="show debugging output")
+                      help="show debugging output")
 
     return parser.parse_args()
 
