@@ -29,14 +29,14 @@ class UrbanDictionary(plugin.Plugin):
         config = utils.get_config("Urban")
 
         if not params:
-            message.dispatch(self.urban.__doc__)
+            return message.dispatch(self.urban.__doc__)
 
         # Check locals first
         entries = json.loads(config.get("local_entries"))
 
-        if entries.get(params):
-            message.dispatch(entries[params])
-            return
+        entry = entries.get(params.strip())
+        if entry:
+            return message.dispatch(entry)
 
         query = urllib.urlencode({"term": params})
         url = "http://www.urbandictionary.com/define.php?%s" % query

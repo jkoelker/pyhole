@@ -119,7 +119,7 @@ class Search(plugin.Plugin):
         else:
             message.dispatch(self.twitter.__doc__)
 
-    @plugin.hook_add_command("urban")
+    @plugin.hook_add_command("totes_not_gonna_use_it_urban")
     @utils.spawn
     def urban(self, message, params=None, **kwargs):
         """Search Urban Dictionary (ex: .urban <query>)"""
