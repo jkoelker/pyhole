@@ -17,29 +17,31 @@ import urllib
 
 from BeautifulSoup import BeautifulSoup
 
-from pyhole import plugin
-from pyhole import utils
+from pyhole.core import plugin
+from pyhole.core import utils
 
 
 class UrbanDictionary(plugin.Plugin):
     @plugin.hook_add_command("urban")
     @utils.spawn
-    def urban(self, params=None, **kwargs):
+    def urban(self, message, params=None, **kwargs):
         """Search Urban Dictionary (ex: .urban <query>)"""
         config = utils.get_config("Urban")
 
         if not params:
-            self.irc.reply(self.urban.__doc__)
+            message.dispatch(self.urban.__doc__)
 
         # Check locals first
         entries = json.loads(config.get("local_entries"))
+
         if entries.get(params):
-            self.irc.reply(entries[params])
+            message.dispatch(entries[params])
             return
 
         query = urllib.urlencode({"term": params})
         url = "http://www.urbandictionary.com/define.php?%s" % query
         response = self.irc.fetch_url(url, self.name)
+
         if not response:
             return
 
@@ -54,9 +56,10 @@ class UrbanDictionary(plugin.Plugin):
         if len(urban) > 0:
             for i, line in enumerate(urban.split("<br/>")):
                 if i <= 4:
-                    self.irc.reply(utils.decode_entities(line))
+                    message.dispatch(utils.decode_entities(line))
+
                 else:
-                    self.irc.reply("[...] %s" % url)
+                    message.dispatch("[...] %s" % url)
                     break
         else:
-            self.irc.reply("No results found: '%s'" % params)
+            message.dispatch("No results found: '%s'" % params)

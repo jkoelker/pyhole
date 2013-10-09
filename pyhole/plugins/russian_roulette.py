@@ -20,7 +20,7 @@ try:
 except ImportError:
     import random
 
-from pyhole import plugin
+from pyhole.core import plugin
 
 
 class RussianRoulette(plugin.Plugin):
@@ -37,29 +37,36 @@ class RussianRoulette(plugin.Plugin):
         return chamber
 
     @plugin.hook_add_command("russian")
-    def roulette(self, params=None, **kwargs):
+    def roulette(self, message, params=None, **kwargs):
         """Play russian roulette:
             play the game: .russian play
             stop the game: .russian wuss
         """
         if params:
             cmd = params.split(' ', 1)[0].lower()
+
             if cmd == 'play':
                 if not self.game:
                     self.game = self._gun()
+
                 if self.game.pop() == 1:
                     result = 'BANG!'
                     self.game = None
+
                 else:
                     result = 'click'
+
             elif cmd == 'wuss':
                 result = 'Come on man, you chicken?'
                 self.game = None
+
             elif cmd == 'thorn':
                 result = 'http://i.imgur.com/fNE4h.jpg'
+
             else:
                 result = self.roulette.__doc__
+
         else:
             result = self.roulette.__doc__
 
-        self.irc.reply(result)
+        message.dispatch(result)

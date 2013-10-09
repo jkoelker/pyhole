@@ -16,14 +16,14 @@
 
 import random
 
-from pyhole import plugin
+from pyhole.core import plugin
 
 
 class Dice(plugin.Plugin):
     """Provide access to dice games"""
 
     @plugin.hook_add_command("roll")
-    def roll(self, params=None, **kwargs):
+    def roll(self, message, params=None, **kwargs):
         """Roll dice (ex: .roll 2d6)"""
         if params:
             query = params.split()[0]
@@ -47,4 +47,4 @@ class Dice(plugin.Plugin):
         else:
             result = self.roll.__doc__
 
-        self.irc.reply(result)
+        message.dispatch(result)

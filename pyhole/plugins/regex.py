@@ -17,8 +17,8 @@
 import random
 import re
 
-from pyhole import plugin
-from pyhole import utils
+from pyhole.core import plugin
+from pyhole.core import utils
 
 
 class RegEx(plugin.Plugin):
@@ -41,12 +41,12 @@ class RegEx(plugin.Plugin):
         """Pushes messages onto the stack"""
 
     @plugin.hook_add_msg_regex('.*')
-    def regex(self, params=None, **kwargs):
+    def regex(self, message, params=None, **kwargs):
         """All message hook"""
 
         try:
             private = kwargs['private']
-            full_message = kwargs['full_message']
+            full_message = message.message
         except TypeError:
             return
 
@@ -54,28 +54,34 @@ class RegEx(plugin.Plugin):
         if not m:
             if private:
                 return
+
             # ignore people messing up and missing the last /
             if re.search('^s\/(.*)\/', full_message):
                 return
-            self.history_update(self.irc.source.split('!')[0], full_message)
+
+            self.history_update(message.source.split('!')[0], full_message)
             return
 
         if 'g' in m.group(3):
             count = 0
+
         else:
             count = 1
 
-        for source, message in self.irc_history:
-            str = re.sub(m.group(1), m.group(2), message, count)
-            if str != message:
-                self.irc.reply("<%s> %s" % (source, str))
+        for source, _msg in self.irc_history:
+            msg = re.sub(m.group(1), m.group(2), _msg, count)
+
+            if msg != message:
+                message.dispatch("<%s> %s" % (source, msg))
+
                 # pretend this really happened
                 if not private:
-                    self.history_update(source, str)
+                    self.history_update(source, msg)
+
                 return
 
     @plugin.hook_add_command('dietz')
-    def dietz(self, params=None, **kwargs):
+    def dietz(self, message, params=None, **kwargs):
         """Docking"""
         try:
             private = kwargs['private']
@@ -84,20 +90,27 @@ class RegEx(plugin.Plugin):
 
         # Get last message from IRC history
         if private:
-           return
-        source, message = self.irc_history[0]
+            return
+
+        source, _msg = self.irc_history[0]
         str_buf = []
-        for word in message.split(" "):
+
+        for word in _msg.split(" "):
             sperms = ""
+
             if random.randint(0, 10) > 9:
-                num_sperms = random.randint(1,3)
+                num_sperms = random.randint(1, 3)
                 condom = []
+
                 for i in xrange(num_sperms):
                     velocity = random.randint(0, 3)
                     condom.append("%s~o" % (" " * velocity))
+
                 sperms = "".join(condom)
+
             shaft = ('=' * len(word))
             dick = "8%sD %s" % (shaft, sperms)
 
             str_buf.append(dick)
-        self.irc.reply("<%s> %s" % (source, ' '.join(str_buf)))
+
+        message.dispatch("<%s> %s" % (source, ' '.join(str_buf)))

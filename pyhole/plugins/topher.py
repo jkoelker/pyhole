@@ -17,8 +17,8 @@
 
 import random
 
-from pyhole import plugin
-from pyhole import utils
+from pyhole.core import plugin
+from pyhole.core import utils
 
 
 phrases = [
@@ -39,9 +39,8 @@ def to_be_or_not_to_be():
 class Topher(plugin.Plugin):
     """I'm a beliber"""
 
-    def __init__(self, irc):
-        self.irc = irc
-        self.name = self.__class__.__name__
+    def __init__(self, *args, **kwargs):
+        plugin.Plugin.__init__(self, *args, **kwargs)
         self.config = utils.get_config("Topher")
 
     def say_hi(self, source, target):
@@ -53,35 +52,38 @@ class Topher(plugin.Plugin):
             self.irc.connection.privmsg(target, greeting)
 
     @plugin.hook_add_action("join")
-    def join(self, params=None, **kwargs):
+    def join(self, message, params=None, **kwargs):
         target = kwargs.get("target")
         source = params
+
         if not source or not target:
             return
+
         self.say_hi(source, target)
 
     @plugin.hook_add_command("hi")
-    def hi(self, params=None, **kwargs):
+    def hi(self, message, params=None, **kwargs):
         greeting = self.config.get("greeting")
+
         if not greeting:
             return
 
-        self.irc.reply(greeting)
+        message.dispatch(greeting)
 
     @plugin.hook_add_msg_regex('smoke')
-    def smoke(self, params=None, **kwargs):
+    def smoke(self, message, params=None, **kwargs):
         if to_be_or_not_to_be():
-            self.irc.reply('But never with the trooooooooooon...')
+            message.dispatch('But never with the trooooooooooon...')
 
     @plugin.hook_add_msg_regex('.')
-    def catchphrase(self, params=None, **kwargs):
+    def catchphrase(self, message, params=None, **kwargs):
         if to_be_or_not_to_be():
             phrases_count = len(phrases)
             which_phrase = random.randint(0, phrases_count - 1)
-            self.irc.reply(phrases[which_phrase])
+            message.dispatch(phrases[which_phrase])
 
     @plugin.hook_add_msg_regex('\?')
-    def piss_roof(self, params=None, **kwargs):
+    def piss_roof(self, message, params=None, **kwargs):
         if to_be_or_not_to_be():
-            self.irc.reply("Yeah, if you don't mind if I take a piss "
-                           "off your roof first")
+            message.dispatch("Yeah, if you don't mind if I take a piss "
+                             "off your roof first")

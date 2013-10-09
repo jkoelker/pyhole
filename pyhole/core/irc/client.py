@@ -162,14 +162,13 @@ class Client(irclib.SimpleIRCClient):
         self.run_keyword_hooks(message, private)
         self.run_msg_regexp_hooks(message, private)
 
-    def poll_action(self, source, action, target=None, msg=None):
+    def poll_action(self, action, msg):
         """Watch for known actions."""
         for mod_name, func, act in plugin.hook_get_actions():
             if action != act:
                 continue
 
-            self.run_hook_command(mod_name, func, source, target=target,
-                                  message=msg)
+            self.run_hook_command(mod_name, func, message=msg, arg=None)
 
     def notice(self, target, msg):
         """Send a notice."""
@@ -297,29 +296,40 @@ class Client(irclib.SimpleIRCClient):
         """Handle joins."""
         target = event.target
         source = event.source.nick
+
+        _msg = Reply(self, message=None, source=source, target=target)
+
         self.log.info("-%s- %s joined" % (target, source))
-        self.poll_action(source, "join", target)
+        self.poll_action("join", _msg)
 
     def on_part(self, _connection, event):
         """Handle parts."""
         target = event.target
         source = event.source.nick
+
+        _msg = Reply(self, message=None, source=source, target=target)
+
         self.log.info("-%s- %s left" % (target, source))
-        self.poll_action(source, "part", target)
+        self.poll_action("part", _msg)
 
     def on_quit(self, _connection, event):
         """Handle quits."""
         source = event.source.nick
+        _msg = Reply(self, message=None, source=source, target=None)
+
         self.log.info("%s quit" % source)
-        self.poll_action(source, "part")
+        self.poll_action("part", _msg)
 
     def on_action(self, _connection, event):
         """Handle IRC actions."""
         target = event.target
         source = event.source.nick
         msg = event.arguments[0]
+
+        _msg = Reply(self, message=msg, source=source, target=target)
+
         self.log.info("-%s- * %s %s" % (target, source, msg))
-        self.poll_action(source, "action", target, msg=msg)
+        self.poll_action("action", _msg)
 
     def on_privnotice(self, _connection, event):
         """Handle private notices."""
