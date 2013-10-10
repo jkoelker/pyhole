@@ -32,7 +32,7 @@ class TinyURL(plugin.Plugin):
         if len(url) > self.config.get("length", type="int", default=50):
             tiny_api = ("http://tinyurl.com/api-create.php?url=" +
                         urllib.quote_plus(url))
-            self.irc.reply(urllib.urlopen(tiny_api).read())
+            message.dispatch(urllib.urlopen(tiny_api).read())
 
     @plugin.hook_add_keyword("http://")
     def http(self, message, params=None, **kwargs):
