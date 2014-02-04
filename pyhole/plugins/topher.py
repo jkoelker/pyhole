@@ -22,12 +22,15 @@ from pyhole.core import utils
 
 
 phrases = [
-    "Low bros before big bros",
-    "Hey guys, I'm actually gonna go do a bunch of errands right now",
-    "They live in the Penthouse penthouse. Thats like the Playboy"
-    " Mansion only this time its much more doper",
-    "Chill out. I told them that you three are coke dealers, and they"
-    " all have really bad coke problems"]
+#    "Low bros before big bros",
+#    "Hey guys, I'm actually gonna go do a bunch of errands right now",
+#    "They live in the Penthouse penthouse. Thats like the Playboy"
+#    " Mansion only this time its much more doper",
+#    "Chill out. I told them that you three are coke dealers, and they"
+#    " all have really bad coke problems"]
+     "Jerry, do you mind if we get back to the task at hand?",
+     "Meeseeks arnet supposed to live this long, things are getting weird",
+]
 
 
 def to_be_or_not_to_be():

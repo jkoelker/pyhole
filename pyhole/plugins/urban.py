@@ -13,6 +13,7 @@
 #   limitations under the License.import urllib
 
 import json
+import textwrap
 import urllib
 
 from BeautifulSoup import BeautifulSoup
@@ -46,17 +47,18 @@ class UrbanDictionary(plugin.Plugin):
             return
 
         soup = BeautifulSoup(response.read())
-        results = soup.findAll("div", {"class": "definition"})
+        results = soup.findAll("div", {"class": "meaning"})
 
         urban = ""
         if len(results):
             urban = " ".join(str(x) for x in soup.findAll(
-                    "div", {"class": "definition"})[0].contents)
+                    "div", {"class": "meaning"})[0].contents)
 
         if len(urban) > 0:
             for i, line in enumerate(urban.split("<br/>")):
                 if i <= 4:
-                    message.dispatch(utils.decode_entities(line))
+                    for msg in textwrap.wrap(utils.decode_entities(line), 400):
+                        message.dispatch(msg)
 
                 else:
                     message.dispatch("[...] %s" % url)
